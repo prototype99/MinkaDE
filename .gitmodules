@@ -1,6 +1,6 @@
 [submodule "ShojiWM"]
 	path = ShojiWM
-	url = https://github.com/bea4dev/ShojiWM
+	url = https://github.com/sophietheopossum/ShojiWM
 [submodule "shoji-bar-2"]
 	path = shoji-bar-2
 	url = https://github.com/sophietheopossum/shoji-bar-2
