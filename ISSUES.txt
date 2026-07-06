@@ -1,0 +1,12 @@
+2. The battery widget remains stuck on calculating
+
+Since 0.1.0
+
+3. Mouse acceleration is slow by default, there is no option to change it
+5. When in floating mode, maximising applications puts the top of them behind the panel
+6. Scaling is excessive for UX482 devices, there is no easy way to change it
+
+Since 0.2.0
+
+1. There is a regression where opening rio terminal will cause ShojiWM to crash
+4. On asus UX482 devices the bottom display is not identified by ShojiWM
