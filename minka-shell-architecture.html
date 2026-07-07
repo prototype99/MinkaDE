@@ -1,0 +1,463 @@
+<title>Minka Shell — Hybrid UI Architecture</title>
+<style>
+  /* Committed single-theme: this page is a preview of Minka's own
+     Eternal-Darkness identity — black ground, red accent, purple tertiary. */
+  :root {
+    --ground: #0a0709;
+    --surface: #161013;
+    --surface-2: #1e161a;
+    --line: #2e2228;
+    --line-soft: #241b20;
+    --text: #ece5e7;
+    --muted: #a3959b;
+    --faint: #6e6167;
+    --red: #e0263c;
+    --red-dim: #8f1e2d;
+    --purple: #a488c9;
+    --purple-dim: #59477a;
+    --mono: ui-monospace, "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+  }
+  html { background: var(--ground); }
+  body {
+    font-family: var(--sans);
+    color: var(--text);
+    background:
+      radial-gradient(1100px 480px at 85% -10%, rgba(224, 38, 60, 0.07), transparent 65%),
+      var(--ground);
+    line-height: 1.6;
+    padding: 0 24px 96px;
+  }
+  .wrap { max-width: 1020px; margin: 0 auto; }
+
+  header { padding: 72px 0 40px; border-bottom: 1px solid var(--line); }
+  .kicker {
+    font-family: var(--mono); font-size: 12px; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--red); margin-bottom: 18px;
+  }
+  h1 {
+    font-size: clamp(30px, 5vw, 46px); font-weight: 750; line-height: 1.08;
+    letter-spacing: -0.015em; text-wrap: balance; margin-bottom: 16px;
+  }
+  h1 .thin { color: var(--muted); font-weight: 400; }
+  .lede { max-width: 62ch; color: var(--muted); font-size: 17px; }
+  .lede strong { color: var(--text); font-weight: 600; }
+
+  section { padding-top: 56px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--red); margin-bottom: 10px;
+  }
+  h2 {
+    font-size: 25px; font-weight: 700; letter-spacing: -0.01em;
+    margin-bottom: 12px; text-wrap: balance;
+  }
+  section > p { max-width: 68ch; color: var(--muted); margin-bottom: 20px; }
+  section > p strong, td strong { color: var(--text); font-weight: 600; }
+  code {
+    font-family: var(--mono); font-size: 0.88em; color: var(--text);
+    background: var(--surface-2); border: 1px solid var(--line-soft);
+    border-radius: 4px; padding: 1px 5px; white-space: nowrap;
+  }
+
+  /* ---------- topology diagram ---------- */
+  .topo { display: grid; gap: 14px; margin-top: 28px; }
+  .topo-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .node {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 8px; padding: 18px 20px;
+  }
+  .node.compositor { border-color: var(--red-dim); }
+  .node h3 { font-size: 16px; font-weight: 700; margin-bottom: 2px; }
+  .node .role {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em;
+    text-transform: uppercase; margin-bottom: 10px;
+  }
+  .role.r-red { color: var(--red); }
+  .role.r-purple { color: var(--purple); }
+  .role.r-mut { color: var(--faint); }
+  .node p { font-size: 13.5px; color: var(--muted); }
+  .node ul { list-style: none; margin-top: 10px; display: flex; flex-direction: column; gap: 5px; }
+  .node li {
+    font-size: 13px; color: var(--muted); padding-left: 14px; position: relative;
+  }
+  .node li::before { content: ""; position: absolute; left: 0; top: 0.62em; width: 6px; height: 1.5px; background: var(--faint); }
+  .node.guido li::before { background: var(--red); }
+  .node.qs li::before { background: var(--purple); }
+
+  .bus {
+    text-align: center; padding: 13px 18px; border: 1px dashed var(--red-dim);
+    border-radius: 8px; background: rgba(224, 38, 60, 0.045);
+  }
+  .bus .path { font-family: var(--mono); font-size: 12.5px; color: var(--text); }
+  .bus .note { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+  .stem { display: flex; justify-content: center; }
+  .stem span { width: 1px; height: 18px; background: var(--red-dim); }
+  .stems { display: grid; grid-template-columns: 1fr 1fr; }
+  .stems span { justify-self: center; width: 1px; height: 18px; background: var(--red-dim); }
+
+  /* ---------- ownership table ---------- */
+  .scroll { overflow-x: auto; margin-top: 24px; border: 1px solid var(--line); border-radius: 8px; }
+  table { border-collapse: collapse; width: 100%; min-width: 720px; font-size: 14px; }
+  th {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--faint); font-weight: 500;
+    text-align: left; padding: 12px 16px; background: var(--surface);
+    border-bottom: 1px solid var(--line);
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: top; color: var(--muted); }
+  tr:last-child td { border-bottom: none; }
+  td:first-child { color: var(--text); font-weight: 600; white-space: nowrap; }
+  .chip {
+    display: inline-block; font-family: var(--mono); font-size: 11px;
+    letter-spacing: 0.08em; padding: 2px 9px 3px; border-radius: 99px;
+    white-space: nowrap; border: 1px solid;
+  }
+  .chip.guido { color: #ff8d9b; border-color: var(--red-dim); background: rgba(224, 38, 60, 0.08); }
+  .chip.qs { color: var(--purple); border-color: var(--purple-dim); background: rgba(164, 136, 201, 0.08); }
+  .chip.wm { color: var(--muted); border-color: var(--line); background: var(--surface); }
+  .layer { font-family: var(--mono); font-size: 12px; color: var(--faint); white-space: nowrap; }
+
+  /* ---------- IPC ---------- */
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 24px; }
+  @media (max-width: 760px) { .cols, .topo-row, .stems { grid-template-columns: 1fr; } .stems span:last-child { display: none; } }
+  pre {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+    padding: 16px 18px; overflow-x: auto; font-family: var(--mono);
+    font-size: 12.5px; line-height: 1.75; color: var(--muted);
+  }
+  pre .c { color: var(--faint); }
+  pre .k { color: #ff8d9b; }
+  pre .s { color: var(--purple); }
+  .rules { display: grid; gap: 10px; margin-top: 22px; }
+  .rule {
+    display: grid; grid-template-columns: 30px 1fr; gap: 14px; align-items: baseline;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 18px;
+  }
+  .rule b { font-family: var(--mono); font-size: 13px; color: var(--red); font-weight: 500; }
+  .rule div { font-size: 14px; color: var(--muted); }
+  .rule div strong { color: var(--text); }
+
+  /* ---------- motion demo ---------- */
+  .demo {
+    margin-top: 24px; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--surface); overflow: hidden;
+  }
+  .demo canvas { display: block; width: 100%; height: 190px; }
+  .demo-caption {
+    display: flex; gap: 20px; flex-wrap: wrap; padding: 12px 18px;
+    border-top: 1px solid var(--line-soft); font-family: var(--mono); font-size: 12px; color: var(--faint);
+  }
+  .demo-caption i { font-style: normal; }
+  .swatch { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 7px; vertical-align: baseline; }
+
+  /* ---------- duo mode ---------- */
+  .duo { display: flex; flex-direction: column; gap: 12px; align-items: center; margin-top: 26px; }
+  .screen {
+    border: 1px solid var(--line); border-radius: 6px; background: var(--surface);
+    width: min(560px, 100%); position: relative;
+  }
+  .screen .tag {
+    position: absolute; top: 8px; left: 10px; font-family: var(--mono);
+    font-size: 10.5px; letter-spacing: 0.1em; color: var(--faint);
+  }
+  .screen.main { aspect-ratio: 1920 / 900; display: grid; place-items: center; }
+  .screen.main p { color: var(--faint); font-size: 13px; }
+  .screen.pad { aspect-ratio: 1920 / 515; display: flex; align-items: stretch; gap: 8px; padding: 26px 12px 12px; }
+  .pad-slot {
+    flex: 1; border-radius: 4px; display: grid; place-items: center;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em;
+  }
+  .pad-slot.qs { border: 1px solid var(--purple-dim); color: var(--purple); background: rgba(164, 136, 201, 0.06); }
+  .pad-slot.gd { border: 1px solid var(--red-dim); color: #ff8d9b; background: rgba(224, 38, 60, 0.06); }
+
+  /* ---------- milestones ---------- */
+  ol.miles { margin: 24px 0 0; padding: 0; list-style: none; counter-reset: m; display: grid; gap: 10px; }
+  ol.miles li {
+    counter-increment: m; display: grid; grid-template-columns: 40px 1fr; gap: 14px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 18px;
+    font-size: 14px; color: var(--muted);
+  }
+  ol.miles li::before {
+    content: "M" counter(m); font-family: var(--mono); font-size: 13px; color: var(--red);
+  }
+  ol.miles strong { color: var(--text); display: block; margin-bottom: 2px; }
+
+  .risk {
+    margin-top: 22px; border-left: 2px solid var(--red); background: var(--surface);
+    border-radius: 0 8px 8px 0; padding: 14px 18px; font-size: 14px; color: var(--muted); max-width: 74ch;
+  }
+  .risk strong { color: var(--text); }
+  a { color: #ff8d9b; text-decoration: none; border-bottom: 1px solid var(--red-dim); }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="kicker">MinkaDE · shell architecture proposal</div>
+    <h1>One socket, two runtimes.<br /><span class="thin">Each pixel owned by the engine that renders it best.</span></h1>
+    <p class="lede">
+      The Minka shell splits along a performance boundary: <strong>Quickshell (Qt6/QML)</strong> owns the
+      widget- and service-heavy surfaces, <strong>Guido (Rust + wgpu)</strong> owns the latency-critical
+      animated overlays. Both are ordinary peers on ShojiWM's existing NDJSON IPC socket — the
+      compositor contract doesn't change at all.
+    </p>
+  </header>
+
+  <section>
+    <div class="eyebrow">Topology</div>
+    <h2>Process layout</h2>
+    <p>
+      ShojiWM's TypeScript config runtime already hosts a Unix socket that broadcasts reactive state
+      and accepts commands. shoji-bar-2 proved the model with one GTK client; the hybrid simply
+      connects two clients instead. Broadcasts fan out to every connection, so neither process needs
+      to know the other exists.
+    </p>
+    <div class="topo">
+      <div class="node compositor">
+        <h3>ShojiWM</h3>
+        <div class="role r-red">Compositor · Rust / Smithay</div>
+        <p>Owns input, layout, DRM/HDR, blur &amp; liquid-glass shaders. Its Node config runtime hosts
+        the IPC server and wakes the Rust side via <code>SIGUSR1</code> after each mutation.</p>
+      </div>
+      <div class="stem"><span></span></div>
+      <div class="bus">
+        <div class="path">$XDG_RUNTIME_DIR/shojiwm-$WAYLAND_DISPLAY.sock</div>
+        <div class="note">newline-delimited JSON · requests with id-correlated responses · fan-out broadcasts</div>
+      </div>
+      <div class="stems"><span></span><span></span></div>
+      <div class="topo-row">
+        <div class="node qs">
+          <h3>minka-shell</h3>
+          <div class="role r-purple">Quickshell · Qt6 / QML</div>
+          <ul>
+            <li>Scene-graph rendering, rich text, vector shapes</li>
+            <li>Built-in daemons: StatusNotifier tray, notification server, PipeWire, UPower, MPRIS, NetworkManager</li>
+            <li>Socket I/O async on the Qt event loop; QML renders on a separate thread</li>
+          </ul>
+        </div>
+        <div class="node guido">
+          <h3>minka-fx</h3>
+          <div class="role r-red">Guido · Rust / wgpu</div>
+          <ul>
+            <li>SDF shapes, spring-physics transforms, per-frame animation</li>
+            <li>Socket registered as a calloop source — same loop as rendering, never blocking it</li>
+            <li>Same language as the compositor; IPC payload types shared via a small <code>minka-ipc</code> crate</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">Ownership</div>
+    <h2>Who draws what</h2>
+    <p>
+      The split follows each runtime's strengths — and Guido's current gaps (v0.5: no text input, no
+      tray, no popup system) make the boundary crisp: anything with forms, lists, or system services
+      is Quickshell; anything transient and animation-bound is Guido.
+    </p>
+    <div class="scroll">
+      <table>
+        <tr><th>Surface</th><th>Runtime</th><th>Layer</th><th>Why</th></tr>
+        <tr><td>Bar / panel</td><td><span class="chip qs">quickshell</span></td><td class="layer">top · exclusive</td>
+          <td>Tray, text, per-workspace widgets — caelestia-style structure.</td></tr>
+        <tr><td>Start menu · launcher</td><td><span class="chip qs">quickshell</span></td><td class="layer">overlay · kb on-demand</td>
+          <td>Fuzzy search needs text input and list virtualization.</td></tr>
+        <tr><td>Control center · status menus</td><td><span class="chip qs">quickshell</span></td><td class="layer">overlay</td>
+          <td>Direct bindings to PipeWire, NetworkManager, UPower.</td></tr>
+        <tr><td>Notification daemon + popups</td><td><span class="chip qs">quickshell</span></td><td class="layer">overlay</td>
+          <td>Quickshell implements <code>org.freedesktop.Notifications</code> natively.</td></tr>
+        <tr><td>Wallpaper</td><td><span class="chip qs">quickshell</span></td><td class="layer">background</td>
+          <td>Static; QML image pipeline + per-output variants.</td></tr>
+        <tr><td>Lockscreen</td><td><span class="chip qs">quickshell</span></td><td class="layer">session-lock</td>
+          <td>ext-session-lock + PAM already integrated.</td></tr>
+        <tr><td>Snap preview</td><td><span class="chip guido">guido</span></td><td class="layer">overlay · no input</td>
+          <td>Tracks a drag at display rate; springs toward broadcast rects.</td></tr>
+        <tr><td>Dock reveal + OSDs</td><td><span class="chip guido">guido</span></td><td class="layer">overlay · no input</td>
+          <td>Volume/brightness/workspace flashes — zephyr-style motion.</td></tr>
+        <tr><td>Monitor identify · drag feedback</td><td><span class="chip guido">guido</span></td><td class="layer">overlay · no input</td>
+          <td>Transient, purely visual, cheap to keep resident.</td></tr>
+        <tr><td>Backdrop blur · liquid glass</td><td><span class="chip wm">shojiwm</span></td><td class="layer">compositor pass</td>
+          <td>True blur needs what's <em>behind</em> the surface; a layer-surface blur flag is a later ShojiWM addition.</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">IPC</div>
+    <h2>The contract stays, the exec channel goes</h2>
+    <p>
+      The wire format and method surface are exactly what shoji-bar-2 already speaks. The one
+      structural change: today keybindings spawn <code>ags request start-menu toggle</code> — a
+      process exec per keypress. The shells hold persistent connections, so the config broadcasts
+      <code>ui.*</code> events instead. Zero spawns, one less CLI dependency.
+    </p>
+    <div class="cols">
+      <pre><span class="c">// requests (client → server, id-correlated)</span>
+{ <span class="k">"id"</span>: 1, <span class="k">"method"</span>: <span class="s">"workspaces.get"</span> }
+{ <span class="k">"method"</span>: <span class="s">"workspaces.activate"</span>,
+  <span class="k">"params"</span>: { <span class="k">"monitor"</span>: <span class="s">"DP-1"</span>, <span class="k">"index"</span>: 2 } }
+{ <span class="k">"method"</span>: <span class="s">"windows.activate"</span>,
+  <span class="k">"params"</span>: { <span class="k">"windowId"</span>: <span class="s">"…"</span> } }</pre>
+      <pre><span class="c">// broadcasts (server → all clients)</span>
+{ <span class="k">"event"</span>: <span class="s">"workspaces.changed"</span>, <span class="k">"payload"</span>: … }
+{ <span class="k">"event"</span>: <span class="s">"snap.preview"</span>,
+  <span class="k">"payload"</span>: { <span class="k">"monitor"</span>, <span class="k">"rect"</span>, <span class="k">"kind"</span> } }
+{ <span class="k">"event"</span>: <span class="s">"dock.proximity"</span>, <span class="k">"payload"</span>: … }
+<span class="c">// new: replaces `ags request` execs</span>
+{ <span class="k">"event"</span>: <span class="s">"ui.startMenu"</span>,
+  <span class="k">"payload"</span>: { <span class="k">"connector"</span>, <span class="k">"action"</span> } }</pre>
+    </div>
+    <div class="rules">
+      <div class="rule"><b>R1</b><div><strong>Never block a render loop on the socket.</strong> Quickshell: async
+        <code>Quickshell.Io.Socket</code> on the Qt event loop. Guido: the socket is a calloop event source
+        beside the frame callback. No thread ever issues a synchronous read.</div></div>
+      <div class="rule"><b>R2</b><div><strong>Diff and coalesce at the source.</strong> The config runtime already
+        JSON-diffs <code>workspaces.changed</code> and coalesces mutations per tick — every new event keeps
+        that discipline, so idle traffic is zero.</div></div>
+      <div class="rule"><b>R3</b><div><strong>Transmit state, not frames.</strong> Broadcasts carry <em>targets</em>
+        (a snap rect, a proximity bool). Clients animate toward them locally. Bandwidth stays trivial and
+        JSON stays fast enough that a binary protocol is not worth its complexity.</div></div>
+      <div class="rule"><b>R4</b><div><strong>Reconnect is a feature.</strong> The socket is recreated on config
+        hot-reload; both clients auto-reconnect and re-fetch <code>workspaces.get</code>, exactly as
+        shoji-bar-2 does today.</div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">Motion</div>
+    <h2>Why 20&thinsp;Hz of IPC looks like 165&thinsp;Hz</h2>
+    <p>
+      The hollow rectangle is what the compositor actually sends — a snap target that jumps a few
+      times per second. The red rectangle is Guido's spring integrating toward it every frame.
+      Smoothness is manufactured client-side, so IPC rate never dictates animation quality.
+    </p>
+    <div class="demo">
+      <canvas id="spring" width="1200" height="380" aria-label="Animation: a red rectangle springs smoothly toward a hollow target rectangle that jumps between positions"></canvas>
+      <div class="demo-caption">
+        <i><span class="swatch" style="background:transparent;border:1px solid #6e6167"></span>broadcast target (~sparse)</i>
+        <i><span class="swatch" style="background:#e0263c"></span>guido spring (every frame)</i>
+        <i id="demo-note"></i>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">Duo mode</div>
+    <h2>Zenbook Duo placement</h2>
+    <p>
+      A <code>ShellLayout</code> policy (shared as config both processes read) resolves monitor roles at
+      startup and on hotplug: when the 1920×515 ScreenPad is present, every persistent surface pins
+      there and the main panel stays clear; otherwise the single-screen KDE-style layout applies.
+      Guido overlays follow the window they serve, so they appear on whichever output the drag is on.
+    </p>
+    <div class="duo">
+      <div class="screen main"><span class="tag">eDP-1 · 1920×1080 · main</span><p>application windows only</p></div>
+      <div class="screen pad">
+        <span class="tag">DP-1 · 1920×515 · ScreenPad</span>
+        <div class="pad-slot qs">bar + tray</div>
+        <div class="pad-slot qs">global menus</div>
+        <div class="pad-slot qs">notifications</div>
+        <div class="pad-slot gd">osd / fx</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">Sequencing</div>
+    <h2>Milestones</h2>
+    <ol class="miles">
+      <li><div><strong>Skeleton</strong> Quickshell scaffold + <code>ShojiIpc</code> QML singleton speaking the
+        existing protocol; bare bar with live workspaces on both displays. shoji-bar-2 keeps running as the
+        reference until parity.</div></li>
+      <li><div><strong>Widget parity</strong> Port the shoji-bar-2 tree — dock, start menu, status/clock menus,
+        tray, notifications — using caelestia-shell's structure as the layout reference.</div></li>
+      <li><div><strong>minka-fx</strong> Guido process + <code>minka-ipc</code> crate; take over snap preview and
+        dock reveal; add zephyr-style OSDs. Retire the <code>ags request</code> exec path for
+        <code>ui.*</code> broadcasts.</div></li>
+      <li><div><strong>Identity pass</strong> Eternal-Darkness theme tokens shared by both runtimes (one
+        <code>theme.json</code>, hot-reloaded via a <code>theme.changed</code> broadcast); compositor-side
+        blur flag for shell surfaces.</div></li>
+    </ol>
+    <div class="risk">
+      <strong>Known risk:</strong> Guido is v0.5 with a tiny community — treat it as an implementation detail
+      behind the <code>minka-fx</code> process boundary. Everything it renders is transient and inputless, so if
+      it stalls as a dependency, the fallback is a few hundred lines of smithay-client-toolkit + wgpu we
+      write ourselves (same crates, same event loop model), not a rewrite of the shell.
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  var canvas = document.getElementById("spring");
+  var ctx = canvas.getContext("2d");
+  var note = document.getElementById("demo-note");
+  var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  var slots = [
+    { x: 0.04, w: 0.28 }, { x: 0.36, w: 0.28 }, { x: 0.68, w: 0.28 },
+    { x: 0.04, w: 0.60 }, { x: 0.36, w: 0.60 }
+  ];
+  var slot = 0;
+  var target = { x: slots[0].x, w: slots[0].w };
+  var pos = { x: slots[0].x, w: slots[0].w };
+  var vel = { x: 0, w: 0 };
+  var lastJump = 0;
+
+  function draw() {
+    var W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+    var top = H * 0.18, height = H * 0.64;
+    // faint guides for all slots
+    ctx.setLineDash([]);
+    for (var i = 0; i < 3; i++) {
+      ctx.strokeStyle = "rgba(110,97,103,0.18)";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(slots[i].x * W, top, slots[i].w * W, height);
+    }
+    // target: hollow, dashed
+    ctx.setLineDash([7, 6]);
+    ctx.strokeStyle = "rgba(163,149,155,0.85)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(target.x * W, top, target.w * W, height);
+    // spring: filled red
+    ctx.setLineDash([]);
+    ctx.fillStyle = "rgba(224,38,60,0.16)";
+    ctx.strokeStyle = "#e0263c";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.rect(pos.x * W, top, pos.w * W, height);
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  if (reduced) {
+    slot = 1; target = slots[1]; pos = { x: slots[1].x + 0.05, w: slots[1].w };
+    note.textContent = "static preview (reduced motion)";
+    draw();
+    return;
+  }
+
+  var stiffness = 170, damping = 22;
+  var prev = performance.now();
+  function tick(now) {
+    var dt = Math.min((now - prev) / 1000, 1 / 30);
+    prev = now;
+    if (now - lastJump > 1400) {
+      lastJump = now;
+      slot = (slot + 1 + Math.floor(Math.random() * (slots.length - 1))) % slots.length;
+      target = slots[slot];
+    }
+    ["x", "w"].forEach(function (k) {
+      var accel = stiffness * (target[k] - pos[k]) - damping * vel[k];
+      vel[k] += accel * dt;
+      pos[k] += vel[k] * dt;
+    });
+    draw();
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+})();
+</script>
