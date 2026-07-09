@@ -16,3 +16,6 @@
 [submodule "MinkaConf"]
 	path = MinkaConf
 	url = git@github.com:sophietheopossum/MinkaConf.git
+[submodule "smithay"]
+	path = smithay
+	url = git@github.com:sophietheopossum/smithay.git
