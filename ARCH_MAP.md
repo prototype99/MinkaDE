@@ -24,7 +24,9 @@ X11 fractional-scaling rendering mode (baseline shipped 2026-07-10; X11 has one 
 * Plumbing:
 * World A is `normalize_to_logical` (smithay fork ClientOutputOverride) + `preferred_scale_for_surface` pin (ShojiWM presentation.rs) — both would become a runtime setting instead of hardcoded.
 * World B additionally requires xwayland-satellite ≥ upstream 33c344f (origin normalization) and the single-stable-output enter gating (refresh_space_outputs), which stays on in both worlds.
-* MinkaConf should normalize saved display layouts so the bounding box origin is (0,0) (like xrandr) — protects distro satellite < 33c344f and anything else assuming an origin-anchored screen.
+* ~~MinkaConf should normalize saved display layouts so the bounding box origin is (0,0) (like xrandr)~~
+Done 2026-07-10, but in the TS runtime rather than MinkaConf: MinkaConf's commitDrag already normalized the arrangement it saves (connected displays only), which still let a disconnect strand the live subset off-origin. `output.configure` in index.tsx now re-anchors the connected, explicitly-positioned outputs to a (0,0) bounding box on every output change
+— protects distro satellite < 33c344f and anything else assuming an origin-anchored screen.
 
 ### Scope & Execution
 Focus entirely on the foundational architecture, the HDR shader pipeline, and the dual-screen display management code first. Skip generic utilities like text editors. You are fully empowered to choose the cleanest technical implementation for this desktop environment—if a specific shader approach or library works better than what I suggested, implement it and show me the results, this includes the window manager. 
