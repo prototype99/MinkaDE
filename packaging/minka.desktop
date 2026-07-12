@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Minka
+Comment=Start the Minka desktop environment (ShojiWM)
+Exec=/usr/bin/minka-session
+Type=Application
+DesktopNames=Minka;ShojiWM
+StartupNotify=true
+Terminal=false

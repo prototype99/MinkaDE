@@ -1,0 +1,15 @@
+#!/bin/sh
+# Minka session wrapper.
+#
+# Environment is exported here rather than in shell rc files so it reaches the
+# compositor no matter which display manager or login shell starts the session.
+
+# Fork of xwayland-satellite with --logical-geometry support (fixes X11 apps
+# on mixed-scale multi-monitor layouts). Installed out of $PATH so it never
+# shadows a distro xwayland-satellite package.
+if [ -x /usr/lib/minka/xwayland-satellite ]; then
+    export SHOJI_XWAYLAND_SATELLITE_PATH=/usr/lib/minka/xwayland-satellite
+    export XWLS_LOGICAL_GEOMETRY=1
+fi
+
+exec /usr/bin/shoji_wm --tty
