@@ -1,0 +1,1 @@
+navigator.mediaDevices.getDisplayMedia({video:true}).then(s=>setTimeout(()=>s.getTracks().forEach(t=>t.stop()),3000));
