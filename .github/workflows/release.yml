@@ -1,0 +1,75 @@
+# Tag → GitHub release with the tester tarball attached.
+#
+# Pushing a version tag (e.g. `git tag 0.9.1 && git push origin 0.9.1`)
+# builds all four release binaries from the submodules pinned by that tag,
+# assembles minkade-<tag>-linux-x86_64.tar.gz via packaging/make-tarball.sh,
+# and publishes it as a GitHub release with auto-generated notes.
+#
+# Pinned to ubuntu-24.04 (glibc 2.39) rather than ubuntu-latest so the
+# prebuilt binaries' baseline doesn't silently move when GitHub rolls the
+# runner image forward.
+name: Release
+
+on:
+  push:
+    tags:
+      - "[0-9]*"
+      - "v[0-9]*"
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      # Several submodules are pinned with SSH URLs; CI has no SSH key, but
+      # all of them are public, so fetch over HTTPS instead.
+      - name: Rewrite SSH submodule URLs to HTTPS
+        run: git config --global url."https://github.com/".insteadOf "git@github.com:"
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config clang rsync \
+            libwayland-dev wayland-protocols libxkbcommon-dev \
+            libudev-dev libinput-dev libseat-dev libgbm-dev libdrm-dev \
+            libegl1-mesa-dev libgles2-mesa-dev \
+            libpipewire-0.3-dev \
+            libxcb1-dev libxcb-cursor-dev
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build ShojiWM (compositor + portal)
+        working-directory: ShojiWM
+        run: cargo build --release
+
+      - name: Build xwayland-satellite
+        working-directory: xwayland-satellite
+        run: cargo build --release
+
+      - name: Build MinkaFX
+        working-directory: MinkaFX
+        run: cargo build --release
+
+      - name: Assemble tarball
+        run: packaging/make-tarball.sh "${GITHUB_REF_NAME}"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "MinkaDE ${GITHUB_REF_NAME}" \
+            --generate-notes \
+            "minkade-${GITHUB_REF_NAME}-linux-x86_64.tar.gz"
